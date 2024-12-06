@@ -7,7 +7,7 @@ bs = 32
 block_size = 8
 max_iters = 3000
 eval_interval = 300
-learning_rate = 1e-2
+learning_rate = 1e-3
 device = "cuda" if torch.cuda.is_available() else "cpu"
 eval_iters = 200
 n_embd = 32
@@ -60,11 +60,39 @@ def estimate_losses():
     return out
 
 
+class Head(nn.Module):
+
+    def __init__(self, head_size):
+        super().__init__()
+        self.key = nn.Linear(n_embd, head_size, bias=False)
+        self.query = nn.Linear(n_embd, head_size, bias=False)
+        self.value = nn.Linear(n_embd, head_size, bias=False)
+        self.register_buffer("tril", torch.tril(torch.ones(block_size, block_size)))
+
+    def forward(self, x):
+        B, T, C = x.shape
+
+        k = self.key(x) # (B, T, head_size)
+        q = self.query(x) # (B, T, head_size)
+
+        wei = q @ k.transpose(-2, -1) * k.shape[-1]**-0.5 # (B, T, C) @ (B, C, T) -> (B, T, T)
+        wei = wei.masked_fill(self.tril[:T, :T] == 0, float("-inf")) # (B, T, T)
+        wei = F.softmax(wei, dim=-1)
+
+        v = self.value(x) # (B, T, head_size)
+        out = wei @ v # (B, T, T) @ (B, T, head_size) -> (B, T, head_size)
+
+        return out
+
+
 class BigramLanguageModel(nn.Module):
 
     def __init__(self):
         super().__init__()
         self.token_embedding_table = nn.Embedding(vocab_size, n_embd)
+
+        # Self-attention head
+        self.sa_head = Head(n_embd)
 
         # As we are using embeddings and not bigrams anymore,
         # a linear layer is needed.
@@ -84,7 +112,8 @@ class BigramLanguageModel(nn.Module):
         pos_emb = self.position_embedding_table(torch.arange(T, device=device)) # (T, C)
 
         # Using the linear layer to get logits
-        x = tok_emb + pos_emb
+        x = tok_emb + pos_emb # (B, T, C)
+        x = self.sa_head(x) # (B, T, head_size)
         logits = self.lm_head(x) # (B, T, vocab_size)
 
         if targets is None:
@@ -105,8 +134,11 @@ class BigramLanguageModel(nn.Module):
     def generate(self, idx, max_new_tokens):
         # idx is a (B, T) array of indices
         for _ in range(max_new_tokens):
+            # look at the block_size context only
+            idx_cond = idx[:, -block_size:]
+
             # get predictions
-            logits, loss = self(idx)
+            logits, loss = self(idx_cond)
             # focus only on the last time step
             logits = logits[:, -1, :] # becomes (B, C)
 

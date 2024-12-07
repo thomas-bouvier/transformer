@@ -3,14 +3,17 @@ import torch.nn as nn
 from torch.nn import functional as F
 
 # hyperparameters
-bs = 32
-block_size = 8
+bs = 64 # how many independent sequences will be processed in parallel?
+block_size = 256
 max_iters = 5000
-eval_interval = 300
-learning_rate = 1e-3
+eval_interval = 500
+learning_rate = 3e-4
 device = "cuda" if torch.cuda.is_available() else "cpu"
 eval_iters = 200
-n_embd = 32
+n_embd = 384
+n_head = 6
+n_layers = 6
+dropout = 0.2
 
 torch.manual_seed(1337)
 
@@ -69,6 +72,8 @@ class Head(nn.Module):
         self.value = nn.Linear(n_embd, head_size, bias=False)
         self.register_buffer("tril", torch.tril(torch.ones(block_size, block_size)))
 
+        self.dropout = nn.Dropout(dropout)
+
     def forward(self, x):
         B, T, C = x.shape
 
@@ -77,7 +82,9 @@ class Head(nn.Module):
 
         wei = q @ k.transpose(-2, -1) * k.shape[-1]**-0.5 # (B, T, C) @ (B, C, T) -> (B, T, T)
         wei = wei.masked_fill(self.tril[:T, :T] == 0, float("-inf")) # (B, T, T)
-        wei = F.softmax(wei, dim=-1)
+        wei = F.softmax(wei, dim=-1) # (B, T, T)
+
+        wei = self.dropout(wei) # randmly prevents some tokens to communicate
 
         v = self.value(x) # (B, T, head_size)
         out = wei @ v # (B, T, T) @ (B, T, head_size) -> (B, T, head_size)
@@ -90,15 +97,17 @@ class MultiHead(nn.Module):
     Multiple heads of self-attention in parallel
     """
 
-    def __init__(self, num_heads, head_size):
+    def __init__(self, n_heads, head_size):
         super().__init__()
 
-        self.heads = nn.ModuleList([Head(head_size) for _ in range(num_heads)])
+        self.heads = nn.ModuleList([Head(head_size) for _ in range(n_heads)])
         self.proj = nn.Linear(n_embd, n_embd)
+        self.dropout = nn.Dropout(dropout)
 
     def forward(self, x):
         out = torch.cat([h(x) for h in self.heads], dim=-1)
         out = self.proj(out) # residual connection
+        out = self.dropout(out) # a bit og regularization
         return out
 
 
@@ -116,6 +125,7 @@ class FeedForward(nn.Module):
             # * 4 because advised in the attention paper
             nn.ReLU(),
             nn.Linear(n_embd * 4, n_embd), # Projection layer going back into the residual pathway
+            nn.Dropout(dropout), 
         )
     
     def forward(self, x):
@@ -127,14 +137,14 @@ class Block(nn.Module):
     Interspace communication between token, and computation on a given token.
     """
 
-    def __init__(self, n_embd, num_heads):
+    def __init__(self, n_embd, n_heads):
         super().__init__()
 
-        head_size = n_embd // num_heads
+        head_size = n_embd // n_heads
 
         # Self-attention head
         #self.sa_head = Head(n_embd)
-        self.sa = MultiHead(num_heads, head_size)
+        self.sa = MultiHead(n_heads, head_size)
         # More heads allows to isolate the processing corresponding to some knowledge
 
         # Some computation
@@ -169,9 +179,7 @@ class BigramLanguageModel(nn.Module):
         self.position_embedding_table = nn.Embedding(block_size, n_embd)
 
         self.blocks = nn.Sequential(
-            Block(n_embd, num_heads=4),
-            Block(n_embd, num_heads=4),
-            Block(n_embd, num_heads=4),
+            *[Block(n_embd, n_heads=n_heads) for _ in range(n_layers)]
         )
 
         # As we are using embeddings and not bigrams anymore,

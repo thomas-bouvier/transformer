@@ -89,29 +89,78 @@ class MultiHead(nn.Module):
 
     def __init__(self, num_heads, head_size):
         super().__init__()
+
         self.heads = nn.ModuleList([Head(head_size) for _ in range(num_heads)])
 
     def forward(self, x):
         return torch.cat([h(x) for h in self.heads], dim=-1)
 
 
-class BigramLanguageModel(nn.Module):
+class FeedForward(nn.Module):
+    """
+    A simple linear layer followed by a non-linearity.
+    This adds some computation into the transformer.
+    """
 
-    def __init__(self):
+    def __init__(self, n_embd):
         super().__init__()
-        self.token_embedding_table = nn.Embedding(vocab_size, n_embd)
+
+        self.net = nn.Sequential(
+            nn.Linear(n_embd, n_embd),
+            nn.ReLU(),
+        )
+    
+    def forward(self, x):
+        return self.net(x)
+
+
+class Block(nn.Module):
+    """
+    Interspace communication between token, and computation on a given token.
+    """
+
+    def __init__(self, n_embd, num_heads):
+        super().__init__()
+
+        head_size = n_embd // num_heads
 
         # Self-attention head
         #self.sa_head = Head(n_embd)
-        self.sa_heads = MultiHead(4, n_embd // 4) # 4 heads of 8-dimensional self-attention
+        self.sa = MultiHead(num_heads, head_size)
+        # More heads allows to isolate the processing corresponding to some knowledge
+
+        # Some computation
+        self.ffwd = FeedForward(n_embd)
+
+    def forward(self, x):
+        x = self.sa(x)
+        x = self.ffwd(x)
+        return x
+
+
+class BigramLanguageModel(nn.Module):
+    """
+    A super simple bigram model.
+    """
+
+    def __init__(self):
+        super().__init__()
+
+        # Embeddings encode token identities
+        self.token_embedding_table = nn.Embedding(vocab_size, n_embd)
+
+        # Positional embeddings encode their position
+        self.position_embedding_table = nn.Embedding(block_size, n_embd)
+
+        self.blocks = nn.Sequential(
+            Block(n_embd, num_heads=4),
+            Block(n_embd, num_heads=4),
+            Block(n_embd, num_heads=4),
+        )
 
         # As we are using embeddings and not bigrams anymore,
         # a linear layer is needed.
         self.lm_head = nn.Linear(n_embd, vocab_size) # (B, T, vocab_size)
-
-        # Embeddings encode token identities
-        # Positional embeddings encode their position
-        self.position_embedding_table = nn.Embedding(block_size, n_embd)
 
     def forward(self, idx, targets=None):
         B, T = idx.shape
@@ -124,7 +173,12 @@ class BigramLanguageModel(nn.Module):
 
         # Using the linear layer to get logits
         x = tok_emb + pos_emb # (B, T, C)
-        x = self.sa_heads(x) # (B, T, head_size)
+
+        # We use Blocks to abstract calls like these
+        #x = self.sa_heads(x) # (B, T, head_size)
+        #x = self.ffwd(x) # (B, T, head_size)
+        x = self.blocks(x)
+
         logits = self.lm_head(x) # (B, T, vocab_size)
 
         if targets is None:

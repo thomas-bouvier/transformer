@@ -140,12 +140,17 @@ class Block(nn.Module):
         # Some computation
         self.ffwd = FeedForward(n_embd)
 
+        self.ln1 = nn.LayerNorm(n_embd)
+        self.ln2 = nn.LayerNorm(n_embd)
+
     def forward(self, x):
         #x = self.sa(x)
         #x = self.ffwd(x)
         # We want to forward gradients to implement residual connections
-        x = x + self.sa(x)
-        x = x + self.ffwd(x)
+        # Apply LayerNorm before self-attention, differently from the original Attention paper
+        # LayerNorms make token unit-mean and unit-gaussian at initialization
+        x = x + self.sa(self.ln1(x)) 
+        x = x + self.ffwd(self.ln2(x))
         return x
 
 

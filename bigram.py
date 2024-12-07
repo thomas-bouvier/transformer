@@ -5,7 +5,7 @@ from torch.nn import functional as F
 # hyperparameters
 bs = 32
 block_size = 8
-max_iters = 3000
+max_iters = 5000
 eval_interval = 300
 learning_rate = 1e-3
 device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -85,6 +85,16 @@ class Head(nn.Module):
         return out
 
 
+class MultiHead(nn.Module):
+
+    def __init__(self, num_heads, head_size):
+        super().__init__()
+        self.heads = nn.ModuleList([Head(head_size) for _ in range(num_heads)])
+
+    def forward(self, x):
+        return torch.cat([h(x) for h in self.heads], dim=-1)
+
+
 class BigramLanguageModel(nn.Module):
 
     def __init__(self):
@@ -92,7 +102,8 @@ class BigramLanguageModel(nn.Module):
         self.token_embedding_table = nn.Embedding(vocab_size, n_embd)
 
         # Self-attention head
-        self.sa_head = Head(n_embd)
+        #self.sa_head = Head(n_embd)
+        self.sa_heads = MultiHead(4, n_embd // 4) # 4 heads of 8-dimensional self-attention
 
         # As we are using embeddings and not bigrams anymore,
         # a linear layer is needed.
@@ -113,7 +124,7 @@ class BigramLanguageModel(nn.Module):
 
         # Using the linear layer to get logits
         x = tok_emb + pos_emb # (B, T, C)
-        x = self.sa_head(x) # (B, T, head_size)
+        x = self.sa_heads(x) # (B, T, head_size)
         logits = self.lm_head(x) # (B, T, vocab_size)
 
         if targets is None:

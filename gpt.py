@@ -13,7 +13,7 @@ eval_iters = 200
 n_embd = 384
 n_heads = 6
 n_layers = 6
-dropout = 0.2
+dropout = 0.25
 
 torch.manual_seed(1337)
 
@@ -266,4 +266,4 @@ for step in range(max_iters):
 idx = torch.zeros((1, 1), dtype=torch.long, device=device)
 print(decode(m.generate(idx, max_new_tokens=300)[0].tolist()))
 
-#open('more.txt', 'w').write(decode(m.generate(idx, max_new_tokens=10000)[0].tolist()))
+#open('output.txt', 'w').write(decode(m.generate(idx, max_new_tokens=10000)[0].tolist()))

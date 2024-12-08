@@ -2,9 +2,26 @@
 
 We build a Generatively Pretrained Transformer (GPT), following the paper "Attention is All You Need" and OpenAI's GPT-2 / GPT-3.
 
-- https://benjaminwarner.dev/2023/07/01/attention-mechanism
-- https://benjaminwarner.dev/2023/07/28/rest-of-the-transformer
-- https://www.youtube.com/watch?v=bMXqnLiVgLk
+Some additional resources on transformers:
+
+- [Creating a Transformer From Scratch, Part One: The Attention Mechanism](https://benjaminwarner.dev/2023/07/01/attention-mechanism)
+- [Creating a Transformer From Scratch, Part Two: The Rest of the Transformer](https://benjaminwarner.dev/2023/07/28/rest-of-the-transformer)
+- [[M2L 2024] Transformers - Lucas Beyer](https://www.youtube.com/watch?v=bMXqnLiVgLk)
+
+Training on a single A100 40GB takes ~15 minutes and produces the text in `output.txt`. The model seems to overfit quite a bit, possibly because of the limited training data.
+
+```
+Step 0: train loss 4.475174903869629, val loss 4.470689296722412
+Step 500: train loss 1.7102497816085815, val loss 1.863983154296875
+Step 1000: train loss 1.444942593574524, val loss 1.6555002927780151
+Step 1500: train loss 1.3290531635284424, val loss 1.5621485710144043
+Step 2000: train loss 1.2531943321228027, val loss 1.5290812253952026
+Step 2500: train loss 1.1971135139465332, val loss 1.5185022354125977
+Step 3000: train loss 1.1427865028381348, val loss 1.5040178298950195
+Step 3500: train loss 1.0996745824813843, val loss 1.5207672119140625
+Step 4000: train loss 1.0571194887161255, val loss 1.5238550901412964
+Step 4500: train loss 1.0115548372268677, val loss 1.524843692779541
+```
 
 ## Setup
 

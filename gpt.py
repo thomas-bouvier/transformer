@@ -11,7 +11,7 @@ learning_rate = 3e-4
 device = "cuda" if torch.cuda.is_available() else "cpu"
 eval_iters = 200
 n_embd = 384
-n_head = 6
+n_heads = 6
 n_layers = 6
 dropout = 0.2
 
@@ -43,7 +43,7 @@ def get_batch(split):
     ix = torch.randint(len(data) - block_size, (bs, )) # get random offsets
     x = torch.stack([data[i:i + block_size] for i in ix]) # stack by row
     y = torch.stack([data[i + 1:i + block_size + 1] for i in ix])
-    return x, y
+    return x.to(device), y.to(device)
 
 
 @torch.no_grad()
@@ -262,6 +262,8 @@ for step in range(max_iters):
     loss.backward()
     optimizer.step()
 
-# Generate from the model
+# Generate from the model, idx is the context
 idx = torch.zeros((1, 1), dtype=torch.long, device=device)
 print(decode(m.generate(idx, max_new_tokens=300)[0].tolist()))
+
+#open('more.txt', 'w').write(decode(m.generate(idx, max_new_tokens=10000)[0].tolist()))

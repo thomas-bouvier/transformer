@@ -2,6 +2,10 @@
 
 We build a Generatively Pretrained Transformer (GPT), following the paper "Attention is All You Need" and OpenAI's GPT-2 / GPT-3.
 
+- https://benjaminwarner.dev/2023/07/01/attention-mechanism
+- https://benjaminwarner.dev/2023/07/28/rest-of-the-transformer
+- https://www.youtube.com/watch?v=bMXqnLiVgLk
+
 ## Setup
 
 Follow the instructions from [`devenv`](https://devenv.sh/getting-started/)
@@ -47,3 +51,10 @@ project.
 
 The `yaml` defines the sources for all the packages, i.e. where are we getting
 the cached builds or build instructions for `nix`.
+
+#### TODO
+
+CUDA support:
+
+- https://github.com/johnrizzo1/myada/blob/6928288910bfd1df8993d8c61bdc5d24d92b4c9e/devenv.nix
+- https://github.com/borh/dm-annotations/blob/06035f4547c68b7bf03b757215b48c76568d8d15/devenv.nix
